@@ -1,0 +1,59 @@
+mapred_verify is a command line tool to verify the sanity of Riak's MapReduce API.
+mapred_verify currently uses Riak's native Erlang interface which means you need
+to have a source checkout of Riak built and locally available.
+
+*** Building mapred_verify ***
+make (Yes, that's all there is to it)
+
+*** Using mapred_verify ****
+Running mapred_verify is pretty simple. Tell the tool the Erlang node name of the
+server to test and the path to the top level of the checked out Riak source and
+mapred_verify will do the rest.
+
+For example, if you wanted to test a server named riak@127.0.0.1 and your Riak
+source checkout lived in /Users/foo/projects/riak you'd invoke mapred_verify
+like this:
+
+./mapred_verify -s riak@127.0.0.1 -c /Users/foo/projects/riak
+
+
+
+*** Interpreting results ***
+mapred_verify runs several combinations of MapReduce jobs using Erlang and
+Javascript. It executes each job against a full bucket and a discrete set
+of inputs to verify the jobs work in both use cases. Finally mapred_verify
+also validates the results to insure the job is returning the correct values.
+
+A successful mapred_verify run looks like this:
+
+./mapred_verify -s riak@192.168.1.106 -c /repos/basho/riak
+Clearing old data from <<"mr_validate">>
+Populating new data to <<"mr_validate">>
+Verifying map/reduce jobs
+Running "Erlang/Erlang"
+   Testing full bucket mapred...OK
+   Testing discrete entries...OK
+Running "JS/JS"
+   Testing full bucket mapred...OK
+   Testing discrete entries...OK
+Running "JS/Erlang"
+   Testing full bucket mapred...OK
+   Testing discrete entries...OK
+Running "Erlang/JS"
+   Testing full bucket mapred...OK
+   Testing discrete entries...OK
+Running "JS/Erlang/JS"
+   Testing full bucket mapred...OK
+   Testing discrete entries...OK
+Running "Erlang/JS/Erlang"
+   Testing full bucket mapred...OK
+   Testing discrete entries...OK
+Running "Erlang/JS/JS"
+   Testing full bucket mapred...OK
+   Testing discrete entries...OK
+Running "Erlang map"
+   Testing full bucket mapred...OK
+   Testing discrete entries...OK
+Running "JS map"
+   Testing full bucket mapred...OK
+   Testing discrete entries...OK

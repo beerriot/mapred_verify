@@ -1,0 +1,12 @@
+{application, mapred_verify,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { mapred_verify, []}},
+  {env, []}
+ ]}.
