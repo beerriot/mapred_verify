@@ -202,9 +202,4 @@ parse_key_size(KeySpec) ->
 generate_body(1) ->
     <<"1">>;
 generate_body(Size) ->
-    generate_body(Size, [<<"1">>]).
-
-generate_body(0, Accum) ->
-    list_to_binary(Accum);
-generate_body(Size, Accum) ->
-    generate_body(Size - 1, [<<"0">>|Accum]).
+    list_to_binary([lists:duplicate(Size-1, $0),"1"]).
