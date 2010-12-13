@@ -4,78 +4,18 @@
 
 -define(BUCKET, <<"mr_validate">>).
 
--define(ERLANG_JOB, [{map, {modfun, riak_kv_mapreduce, map_object_value}, none, false},
-                     {reduce, {modfun, riak_kv_mapreduce, reduce_string_to_integer}, none, false},
-                     {reduce, {modfun, riak_kv_mapreduce, reduce_sum}, none, true}]).
-
--define(JS_JOB, [{map, {jsfun, <<"Riak.mapValuesJson">>}, none, false},
-                 {reduce, {jsfun, <<"Riak.reduceSum">>}, none, true}]).
-
--define(MIXED_JOB1, [{map, {jsfun, <<"Riak.mapValuesJson">>}, none, false},
-                     {reduce, {modfun, riak_kv_mapreduce, reduce_sum}, none, true}]).
-
--define(MIXED_JOB2, [{map, {modfun, riak_kv_mapreduce, map_object_value}, none, false},
-                     {reduce, {jsfun, <<"Riak.reduceSort">>}, none, true}]).
-
--define(MIXED_JOB3, [{map, {jsfun, <<"Riak.mapValuesJson">>}, none, false},
-                     {reduce, {modfun, riak_kv_mapreduce, reduce_sort}, none, false},
-                     {reduce, {jsfun, <<"Riak.reduceSum">>}, none, true}].
-
--define(MIXED_JOB4, [{map, {modfun, riak_kv_mapreduce, map_object_value}, none, false},
-                     {reduce, {jsanon, list_to_binary([<<"function(v) { values = Riak.filterNotFound(v);">>,
-                                                       <<"return values.map(function(value) { if (typeof value === 'string') {">>,
-                                                       <<" return JSON.parse(value); } else { return value; } });}">>])},
-                      none, false},
-                     {reduce, {modfun, riak_kv_mapreduce, reduce_sum}, none, true}]).
-
--define(MIXED_JOB5, [{map, {modfun, riak_kv_mapreduce, map_object_value}, none, false},
-                     {reduce, {jsanon, list_to_binary([<<"function(v) { values = Riak.filterNotFound(v);">>,
-                                                       <<"return values.map(function(value) { if (typeof value === 'string') {">>,
-                                                       <<" return JSON.parse(value); } else { return value; } });}">>])},
-                      none, false},
-                     {reduce, {jsfun, <<"Riak.reduceSum">>}, none, true}]).
-
--define(JS_MAP_JOB, [{map, {jsfun, <<"Riak.mapValuesJson">>}, none, true}]).
--define(ERLANG_MAP_JOB, [{map, {modfun, riak_kv_mapreduce, map_object_value}, none, true}]).
-
--define(MAP_JOB_VERIFIER, fun(_Type, Result, TotalEntries) -> io:format("Got ~p, Expecting: ~p...", [length(Result), TotalEntries]),
-                                                                        length(Result) == TotalEntries end).
--define(SIMPLE_JOB_VERIFIER, fun(_Type, Result, TotalEntries) -> [R] = Result, R =< TotalEntries end).
--define(SORTED_JOB_VERIFIER, fun(_Type, Result, TotalEntries) -> RS = length(Result),
-                                                          case RS == TotalEntries orelse TotalEntries > RS of
-                                                              true ->
-                                                                  if RS > 0 ->
-                                                                          R1 = lists:nth(1, Result),
-                                                                          R2 = lists:nth(2, Result),
-                                                                          R1 < R2 orelse R1 == R2;
-                                                                     true ->
-                                                                          true
-                                                                  end;
-                                                              false ->
-                                                                  false
-                                                          end end).
-
--define(TESTS, [{"Erlang/Erlang", {?ERLANG_JOB, ?SIMPLE_JOB_VERIFIER}},
-                {"JS/JS", {?JS_JOB, ?SIMPLE_JOB_VERIFIER}},
-                {"JS/Erlang", {?MIXED_JOB1, ?SIMPLE_JOB_VERIFIER}},
-                {"Erlang/JS", {?MIXED_JOB2, ?SORTED_JOB_VERIFIER}},
-                {"JS/Erlang/JS", {?MIXED_JOB3, ?SIMPLE_JOB_VERIFIER}},
-                {"Erlang/JS/Erlang", {?MIXED_JOB4, ?SIMPLE_JOB_VERIFIER}},
-                {"Erlang/JS/JS", {?MIXED_JOB5, ?SIMPLE_JOB_VERIFIER}},
-                {"Erlang map", {?ERLANG_MAP_JOB, ?MAP_JOB_VERIFIER}},
-                {"JS map", {?JS_MAP_JOB, ?MAP_JOB_VERIFIER}}]).
-
 main([]) ->
     usage();
 main(Args) ->
     case setup_environment(Args) of
-        {ok, NodeName, KeyCount, KeySize, Populate, RunJobs} ->
-            do_verification(NodeName, KeyCount, KeySize, Populate, RunJobs);
+        {ok, NodeName, KeyCount, KeySize, Populate, RunJobs, TestFile} ->
+            do_verification(NodeName, KeyCount, KeySize, Populate, RunJobs,
+                            TestFile);
         error ->
             usage()
     end.
 
-do_verification(NodeName, KeyCount, KeySize, Populate, RunJobs) ->
+do_verification(NodeName, KeyCount, KeySize, Populate, RunJobs, TestFile) ->
     {T1, T2, T3} = erlang:now(),
     random:seed(T1, T2, T3),
     {ok, Client} = riak:client_connect(NodeName),
@@ -91,7 +31,7 @@ do_verification(NodeName, KeyCount, KeySize, Populate, RunJobs) ->
     case RunJobs of
         true ->
             io:format("Verifying map/reduce jobs~n"),
-            run_jobs(Client, ?BUCKET, KeyCount);
+            run_jobs(Client, ?BUCKET, KeyCount, TestFile);
         false ->
             ok
     end.
@@ -115,10 +55,19 @@ populate_bucket(Client, BucketName, KeySize, EntryNum) ->
     ok = Client:put(Obj, 0),
     populate_bucket(Client, BucketName, KeySize, EntryNum - 1).
 
-run_jobs(Client, Bucket, KeyCount) ->
+run_jobs(Client, Bucket, KeyCount, TestFile) ->
+    Tests = test_descriptions(TestFile),
     F = fun({Label, {Job, Verifier}}) ->
                 verify_job(Client, Bucket, KeyCount, Label, Job, Verifier) end,
-    lists:foreach(F, ?TESTS).
+    lists:foreach(F, Tests).
+
+test_descriptions(TestFile) ->
+    case file:consult(TestFile) of
+        {ok, Tests} -> Tests;
+        Error ->
+            io:format("Error loading test definition file: ~p~n", [Error]),
+            exit(-1)
+    end.
 
 verify_job(Client, Bucket, KeyCount, Label, JobDesc, Verifier) ->
     io:format("Running ~p~n", [Label]),
@@ -141,14 +90,14 @@ verify_bucket_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
     Start = erlang:now(),
     {ok, Result} = Client:mapred_bucket(Bucket, JobDesc, 120000),
     End = erlang:now(),
-    {Verifier(bucket, Result, KeyCount), erlang:round(timer:now_diff(End, Start) / 1000)}.
+    {mapred_verifiers:Verifier(bucket, Result, KeyCount), erlang:round(timer:now_diff(End, Start) / 1000)}.
 
 verify_entries_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
     Inputs = select_inputs(Bucket, KeyCount),
     Start = erlang:now(),
     {ok, Result} = Client:mapred(Inputs, JobDesc, 120000),
     End = erlang:now(),
-    {Verifier(entries, Result, length(Inputs)), erlang:round(timer:now_diff(End, Start) / 1000)}.
+    {mapred_verifiers:Verifier(entries, Result, length(Inputs)), erlang:round(timer:now_diff(End, Start) / 1000)}.
 
 entry_num_to_key(EntryNum) ->
     list_to_binary(["mrv", integer_to_list(EntryNum)]).
@@ -158,7 +107,7 @@ select_inputs(Bucket, KeyCount) ->
                                              random:uniform(2) == 2].
 
 usage() ->
-    io:format("~p -s <Erlang node name> -c <path to top of Riak source tree> [-k keycount -p -j]~n", [?MODULE]).
+    io:format("~p -s <Erlang node name> -c <path to top of Riak source tree> [-k keycount -p -j -f <filename>]~n", [?MODULE]).
 
 setup_environment(Args) ->
     case get_argument("-s", Args) of
@@ -177,7 +126,8 @@ setup_environment(Args) ->
                                      list_to_integer(get_argument("-k", Args, "1000")),
                                      parse_key_size(get_argument("-ks", Args, "1b")),
                                      list_to_atom(get_argument("-p", Args, "false")),
-                                     list_to_atom(get_argument("-j", Args, "false"))};
+                                     list_to_atom(get_argument("-j", Args, "false")),
+                                     get_argument("-f", Args, "priv/tests.def")};
                                 error ->
                                     error
                             end;
