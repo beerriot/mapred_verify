@@ -22,18 +22,6 @@ simple(_Type, Result, TotalEntries) ->
 %% @spec sorted(type(), [term()], integer()) -> boolean()
 %% @doc Checks that Result is a list whose length is less than or
 %%      equal to TotalEntries, and whose elements are sorted.
-%%      TODO: only checking first two elements of list, not the whole thing
 sorted(_Type, Result, TotalEntries) ->
-    RS = length(Result),
-    case RS == TotalEntries orelse TotalEntries > RS of
-        true ->
-            if RS > 0 ->
-                    R1 = lists:nth(1, Result),
-                    R2 = lists:nth(2, Result),
-                    R1 < R2 orelse R1 == R2;
-               true ->
-                    true
-            end;
-        false ->
-            false
-    end.
+    length(Result) =< TotalEntries andalso
+        Result == lists:sort(Result).
