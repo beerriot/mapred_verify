@@ -14,10 +14,9 @@ map(_Type, Result, TotalEntries) ->
 %% @spec simple(type(), [term()], integer()) -> boolean()
 %% @doc Checks that Result is a single-element list, that element
 %%      being an integer less than or equal to TotalEntries.
-%%      TODO: actually not checking 'integer', just =<
 simple(_Type, Result, TotalEntries) ->
     [R] = Result,
-    R =< TotalEntries.
+    is_integer(R) andalso R =< TotalEntries.
 
 %% @spec sorted(type(), [term()], integer()) -> boolean()
 %% @doc Checks that Result is a list whose length is less than or
