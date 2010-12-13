@@ -107,7 +107,15 @@ select_inputs(Bucket, KeyCount) ->
                                              random:uniform(2) == 2].
 
 usage() ->
-    io:format("~p -s <Erlang node name> -c <path to top of Riak source tree> [-k keycount -p -j -f <filename>]~n", [?MODULE]).
+    io:format("~p"
+              " -s <Erlang node name>"
+              " -c <path to top of Riak source tree>"
+              " [-k keycount]"
+              " [-ks objectsize{k|b}]"
+              " [-p true|false]"
+              " [-j true|false]"
+              " [-f <filename>]~n",
+              [?MODULE]).
 
 setup_environment(Args) ->
     case get_argument("-s", Args) of
