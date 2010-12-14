@@ -3,35 +3,37 @@
 -export([main/1]).
 
 -define(BUCKET, <<"mr_validate">>).
+-define(PROP(K, L), proplists:get_value(K, L)).
 
 main([]) ->
     usage();
 main(Args) ->
     case setup_environment(Args) of
-        {ok, NodeName, KeyCount, KeySize, Populate, RunJobs, TestFile} ->
-            do_verification(NodeName, KeyCount, KeySize, Populate, RunJobs,
-                            TestFile);
+        {ok, Props} ->
+            do_verification(Props);
         error ->
             usage()
     end.
 
-do_verification(NodeName, KeyCount, KeySize, Populate, RunJobs, TestFile) ->
+do_verification(Props) ->
     {T1, T2, T3} = erlang:now(),
     random:seed(T1, T2, T3),
-    {ok, Client} = riak:client_connect(NodeName),
-    case Populate of
+    {ok, Client} = riak:client_connect(?PROP(node, Props)),
+    KeyCount = ?PROP(keycount, Props),
+    case ?PROP(populate, Props) of
         true ->
             io:format("Clearing old data from ~p~n", [?BUCKET]),
             ok = clear_bucket(Client, ?BUCKET, erlang:round(KeyCount * 1.25)),
             io:format("Populating new data to ~p~n", [?BUCKET]),
-            ok = populate_bucket(Client, ?BUCKET, KeySize, KeyCount);
+            ok = populate_bucket(Client, ?BUCKET,
+                                 ?PROP(bodysize, Props), KeyCount);
         false ->
             ok
     end,
-    case RunJobs of
+    case ?PROP(runjobs, Props) of
         true ->
             io:format("Verifying map/reduce jobs~n"),
-            run_jobs(Client, ?BUCKET, KeyCount, TestFile);
+            run_jobs(Client, ?BUCKET, KeyCount, ?PROP(testdef, Props));
         false ->
             ok
     end.
@@ -111,38 +113,37 @@ usage() ->
               " -s <Erlang node name>"
               " -c <path to top of Riak source tree>"
               " [-k keycount]"
-              " [-ks objectsize{k|b}]"
+              " [-b objectsize{k|b}]"
               " [-p true|false]"
               " [-j true|false]"
               " [-f <filename>]~n",
               [?MODULE]).
 
 setup_environment(Args) ->
-    case get_argument("-s", Args) of
-        error ->
-            error;
-        Node ->
-            case get_argument("-c", Args) of
-                error ->
-                    error;
-                Path ->
-                    case setup_code_paths(Path) of
+    Extracted = [ {Name, extract_arg(Flag, Type, Args, Default)}
+                  || {Name, Flag, Type, Default} <-
+                         [{node, "-s", atom, error},
+                          {path, "-c", string, error},
+                          {keycount, "-k", integer, 1000},
+                          {bodysize, "-b", kbinteger, 1},
+                          {populate, "-p", atom, false},
+                          {runjobs, "-j", atom, false},
+                          {testdef, "-f", string, "priv/tests.def"}]],
+    case {?PROP(node, Extracted), ?PROP(path, Extracted)} of
+        {N, P} when N =/= error, P =/= error ->
+            case setup_code_paths(P) of
+                ok ->
+                    case setup_networking() of
                         ok ->
-                            case setup_networking() of
-                                ok ->
-                                    {ok, list_to_atom(Node),
-                                     list_to_integer(get_argument("-k", Args, "1000")),
-                                     parse_key_size(get_argument("-ks", Args, "1b")),
-                                     list_to_atom(get_argument("-p", Args, "false")),
-                                     list_to_atom(get_argument("-j", Args, "false")),
-                                     get_argument("-f", Args, "priv/tests.def")};
-                                error ->
-                                    error
-                            end;
+                            {ok, Extracted};
                         error ->
                             error
-                    end
-            end
+                    end;
+                error ->
+                    error
+            end;
+        _ ->
+            error
     end.
 
 setup_code_paths(Path) ->
@@ -165,20 +166,17 @@ setup_paths([{Label, Path}|T]) ->
             error
     end.
 
-get_argument(Name, Args) ->
-    get_argument(Name, Args, error).
-
-get_argument(_Name, [], Default) ->
-    Default;
-get_argument(Name, [Name|T], _Default) ->
-    case T of
-        [] ->
-            error;
-        _ ->
-            hd(T)
+extract_arg(Name, Type, [Name,Val|_Rest], _Default) ->
+    case Type of
+        string    -> Val;
+        integer   -> list_to_integer(Val);
+        kbinteger -> parse_kbinteger(Val);
+        atom      -> list_to_atom(Val)
     end;
-get_argument(Name, [_|T], Default) ->
-    get_argument(Name, T, Default).
+extract_arg(Name, Type, [_,_|Rest], Default) ->
+    extract_arg(Name, Type, Rest, Default);
+extract_arg(_Name, _Type, _, Default) ->
+    Default.
 
 setup_networking() ->
     {T1, T2, T3} = erlang:now(),
@@ -193,21 +191,23 @@ setup_networking() ->
     erlang:set_cookie(NodeName, riak),
     ok.
 
-parse_key_size("1b") ->
-    1;
-parse_key_size(KeySpec) ->
-    Unit = case hd(lists:reverse(KeySpec)) of
-               $b ->
-                   1;
+%% parse things like
+%%   "12"   == 12
+%%   "100b" == 100
+%%   "1k"   == 1024
+%%   "40k"  == 40960
+parse_kbinteger(KeySpec) ->
+    [UnitChar|RevVal] = lists:reverse(KeySpec),
+    Unit = case UnitChar of
                $k ->
                    1024;
-               _ ->
+               $b ->
+                   1;
+               C when 0 =< C, C =< 9 ->
                    1
            end,
-    Size = string:substr(KeySpec, 1, length(KeySpec) - 1),
+    Size = lists:reverse(RevVal),
     list_to_integer(Size) * Unit.
 
-generate_body(1) ->
-    <<"1">>;
 generate_body(Size) ->
     list_to_binary([lists:duplicate(Size-1, $0),"1"]).
