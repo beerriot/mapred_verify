@@ -87,7 +87,26 @@ verify_job(Client, Bucket, KeyCount, Label, JobDesc, Verifier) ->
             io:format("OK (~p)~n", [BTime]);
         {false, _} ->
             io:format("FAIL~n")
+    end,
+    io:format("   Testing filtered bucket mapred..."),
+    case verify_filter_job(Client, Bucket, KeyCount, JobDesc, Verifier) of
+        {true, FTime} ->
+            io:format("OK (~p)~n", [FTime]);
+        {false, _} ->
+            io:format("FAIL~n")
     end.
+
+verify_filter_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
+    Filter = [[<<"or">>,
+                         [[<<"ends_with">>,<<"1">>]],
+                         [[<<"ends_with">>,<<"5">>]]
+                        ]],
+    Start = erlang:now(),
+    {ok, Result} = Client:mapred_bucket({Bucket,Filter}, JobDesc, 120000),
+    End = erlang:now(),
+    Inputs = compute_filter(KeyCount, Filter),
+    {mapred_verifiers:Verifier(bucket, Result, length(Inputs)),
+     erlang:round(timer:now_diff(End, Start) / 1000)}.
 
 verify_bucket_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
     Start = erlang:now(),
@@ -111,6 +130,18 @@ select_inputs(Bucket, KeyCount) ->
     [{Bucket, entry_num_to_key(EntryNum)}
      || EntryNum <- lists:seq(1, KeyCount),
         random:uniform(2) == 2].
+
+compute_filter(KeyCount, FilterSpec) ->
+    {ok, Filter} = riak_kv_mapred_filters:build_exprs(FilterSpec),
+    lists:filter(fun(K) -> run_filters(Filter, K) end,
+                 [ entry_num_to_key(EntryNum)
+                   || EntryNum <- lists:seq(1, KeyCount) ]).
+
+run_filters([{Mod,Fun,Args}|Rest], Acc) ->
+    Filter = Mod:Fun(Args),
+    run_filters(Rest, Filter(Acc));
+run_filters([], Acc) ->
+    Acc.
 
 usage() ->
     io:format("~p"
