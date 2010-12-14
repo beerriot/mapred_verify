@@ -73,28 +73,21 @@ test_descriptions(TestFile) ->
     end.
 
 verify_job(Client, Bucket, KeyCount, Label, JobDesc, Verifier) ->
+    Tests = [{"discrete entries", fun verify_entries_job/5},
+             {"full bucket mapred", fun verify_bucket_job/5},
+             {"filtered bucket mapred", fun verify_filter_job/5}],
     io:format("Running ~p~n", [Label]),
-    io:format("   Testing discrete entries..."),
-    case verify_entries_job(Client, Bucket, KeyCount, JobDesc, Verifier) of
-        {true, ETime} ->
-            io:format("OK (~p)~n", [ETime]);
-        {false, _} ->
-            io:format("FAIL~n")
-    end,
-    io:format("   Testing full bucket mapred..."),
-    case verify_bucket_job(Client, Bucket, KeyCount, JobDesc, Verifier) of
-        {true, BTime} ->
-            io:format("OK (~p)~n", [BTime]);
-        {false, _} ->
-            io:format("FAIL~n")
-    end,
-    io:format("   Testing filtered bucket mapred..."),
-    case verify_filter_job(Client, Bucket, KeyCount, JobDesc, Verifier) of
-        {true, FTime} ->
-            io:format("OK (~p)~n", [FTime]);
-        {false, _} ->
-            io:format("FAIL~n")
-    end.
+    lists:foreach(
+      fun({Type, Fun}) ->
+              io:format("   Testing ~s...", [Type]),
+              case Fun(Client, Bucket, KeyCount, JobDesc, Verifier) of
+                  {true, ETime} ->
+                      io:format("OK (~p)~n", [ETime]);
+                  {false, _} ->
+                      io:format("FAIL~n")
+              end
+      end,
+      Tests).
 
 verify_filter_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
     Filter = [[<<"or">>,
