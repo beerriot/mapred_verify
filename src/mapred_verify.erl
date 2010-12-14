@@ -60,7 +60,8 @@ populate_bucket(Client, BucketName, KeySize, EntryNum) ->
 run_jobs(Client, Bucket, KeyCount, TestFile) ->
     Tests = test_descriptions(TestFile),
     F = fun({Label, {Job, Verifier}}) ->
-                verify_job(Client, Bucket, KeyCount, Label, Job, Verifier) end,
+                verify_job(Client, Bucket, KeyCount, Label, Job, Verifier)
+        end,
     lists:foreach(F, Tests).
 
 test_descriptions(TestFile) ->
@@ -92,21 +93,24 @@ verify_bucket_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
     Start = erlang:now(),
     {ok, Result} = Client:mapred_bucket(Bucket, JobDesc, 120000),
     End = erlang:now(),
-    {mapred_verifiers:Verifier(bucket, Result, KeyCount), erlang:round(timer:now_diff(End, Start) / 1000)}.
+    {mapred_verifiers:Verifier(bucket, Result, KeyCount),
+     erlang:round(timer:now_diff(End, Start) / 1000)}.
 
 verify_entries_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
     Inputs = select_inputs(Bucket, KeyCount),
     Start = erlang:now(),
     {ok, Result} = Client:mapred(Inputs, JobDesc, 120000),
     End = erlang:now(),
-    {mapred_verifiers:Verifier(entries, Result, length(Inputs)), erlang:round(timer:now_diff(End, Start) / 1000)}.
+    {mapred_verifiers:Verifier(entries, Result, length(Inputs)),
+     erlang:round(timer:now_diff(End, Start) / 1000)}.
 
 entry_num_to_key(EntryNum) ->
     list_to_binary(["mrv", integer_to_list(EntryNum)]).
 
 select_inputs(Bucket, KeyCount) ->
-    [{Bucket, entry_num_to_key(EntryNum)} || EntryNum <- lists:seq(1, KeyCount),
-                                             random:uniform(2) == 2].
+    [{Bucket, entry_num_to_key(EntryNum)}
+     || EntryNum <- lists:seq(1, KeyCount),
+        random:uniform(2) == 2].
 
 usage() ->
     io:format("~p"
@@ -161,7 +165,8 @@ setup_paths([{Label, Path}|T]) ->
             code:add_pathz(Path),
             setup_paths(T);
         false ->
-            io:format("ERROR: Path for ~p (~p) not found or doesn't point to a directory.~n",
+            io:format("ERROR: Path for ~p (~p) not found"
+                      " or doesn't point to a directory.~n",
                       [Label, Path]),
             error
     end.
