@@ -91,9 +91,9 @@ verify_job(Client, Bucket, KeyCount, Label, JobDesc, Verifier) ->
 
 verify_filter_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
     Filter = [[<<"or">>,
-                         [[<<"ends_with">>,<<"1">>]],
-                         [[<<"ends_with">>,<<"5">>]]
-                        ]],
+               [[<<"ends_with">>,<<"1">>]],
+               [[<<"ends_with">>,<<"5">>]]
+              ]],
     Start = erlang:now(),
     {ok, Result} = Client:mapred_bucket({Bucket,Filter}, JobDesc, 120000),
     End = erlang:now(),
