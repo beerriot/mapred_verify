@@ -7,6 +7,14 @@
 %% @spec map(type(), [term()], integer()) -> boolean()
 %% @doc Checks that the Result is TotalEntries in length.
 %%      Returns 'true' if so, false if not.
+map(missing, [_], 0) ->
+    %% the bare "JS map" case is hard to test because Javascript map
+    %% phases include an error result if the bucket/key is missing,
+    %% unlike Erlang map phases
+    %% the "Erlang map" case has been setup to behave similarly for
+    %% the purpose of excersizing the "include_notfound" argument
+    io:format("Warning: 1 Map Result?"),
+    true;
 map(_Type, Result, TotalEntries) ->
     io:format("Got ~p, Expecting: ~p...", [length(Result), TotalEntries]),
     length(Result) == TotalEntries.
