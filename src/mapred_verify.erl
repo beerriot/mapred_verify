@@ -54,8 +54,17 @@ populate_bucket(_Client, _BucketName, _KeySize, 0) ->
 populate_bucket(Client, BucketName, KeySize, EntryNum) ->
     Key = entry_num_to_key(EntryNum),
     Obj = riak_object:new(BucketName, Key, generate_body(KeySize)),
-    ok = Client:put(Obj, 0),
+    LinkObj = add_links(Obj, BucketName, EntryNum),
+    ok = Client:put(LinkObj, 0),
     populate_bucket(Client, BucketName, KeySize, EntryNum - 1).
+
+add_links(Obj, BucketName, EntryNum) ->
+    MD0 = riak_object:get_metadata(Obj),
+    MD1 = dict:store(<<"Links">>,
+                     [{{BucketName, entry_num_to_key(EntryNum-1)},<<"prev">>},
+                      {{BucketName, entry_num_to_key(EntryNum+1)},<<"next">>}],
+                     MD0),
+    riak_object:update_metadata(Obj, MD1).
 
 run_jobs(Client, Bucket, KeyCount, TestFile) ->
     Tests = test_descriptions(TestFile),

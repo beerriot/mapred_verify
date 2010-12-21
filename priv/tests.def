@@ -72,3 +72,15 @@
 {"JS map",
  {[{map, {jsfun, <<"Riak.mapValuesJson">>}, none, true}],
   map}}.
+
+{"Link prev",
+ {[{link, '_', <<"prev">>,               false},
+   {map, {jsanon,
+          <<"function(v,d) {
+                if (d == 'prev')
+                   return [v.key];
+                else
+                   return [];
+             }">>},
+                                   none, true}],
+  map}}.
