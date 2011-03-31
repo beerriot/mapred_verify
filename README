@@ -10,13 +10,13 @@ Running mapred_verify is pretty simple. Tell the tool the Erlang node name of th
 server to test and the path to the top level of the checked out Riak source and
 mapred_verify will do the rest.
 
-For example, if you wanted to test a server named riak@127.0.0.1 and your Riak
-source checkout lived in /Users/foo/projects/riak you'd invoke mapred_verify
-like this:
+mapred_verify has two modes: population and execution. To populate test data,
+tell mapred_verify the desired size of each object and how many objects to
+create:
 
-./mapred_verify -s riak@127.0.0.1 -c /Users/foo/projects/riak
+./mapred_verify -s riak@127.0.0.1 -c /Users/foo/projects/riak -k 5000 -ks 8192b -p true
 
-
+The above command line will generate and store 5000 8kb objects.
 
 *** Interpreting results ***
 mapred_verify runs several combinations of MapReduce jobs using Erlang and
@@ -24,36 +24,36 @@ Javascript. It executes each job against a full bucket and a discrete set
 of inputs to verify the jobs work in both use cases. Finally mapred_verify
 also validates the results to insure the job is returning the correct values.
 
-A successful mapred_verify run looks like this:
+A successful mapred_verify run looks like the snippet below (times for each
+step reported in milliseconds):
 
-./mapred_verify -s riak@192.168.1.106 -c /repos/basho/riak
-Clearing old data from <<"mr_validate">>
-Populating new data to <<"mr_validate">>
+./mapred_verify -s riak@192.168.1.106 -c /repos/basho/riak -k 5000 -j true
+
 Verifying map/reduce jobs
 Running "Erlang/Erlang"
-   Testing full bucket mapred...OK
-   Testing discrete entries...OK
+   Testing discrete entries...OK (697)
+   Testing full bucket mapred...OK (1474)
 Running "JS/JS"
-   Testing full bucket mapred...OK
-   Testing discrete entries...OK
+   Testing discrete entries...OK (6548)
+   Testing full bucket mapred...OK (11670)
 Running "JS/Erlang"
-   Testing full bucket mapred...OK
-   Testing discrete entries...OK
+   Testing discrete entries...OK (3899)
+   Testing full bucket mapred...OK (11963)
 Running "Erlang/JS"
-   Testing full bucket mapred...OK
-   Testing discrete entries...OK
+   Testing discrete entries...OK (7179)
+   Testing full bucket mapred...OK (15231)
 Running "JS/Erlang/JS"
-   Testing full bucket mapred...OK
-   Testing discrete entries...OK
+   Testing discrete entries...OK (4209)
+   Testing full bucket mapred...OK (12067)
 Running "Erlang/JS/Erlang"
-   Testing full bucket mapred...OK
-   Testing discrete entries...OK
+   Testing discrete entries...OK (5288)
+   Testing full bucket mapred...OK (10577)
 Running "Erlang/JS/JS"
-   Testing full bucket mapred...OK
-   Testing discrete entries...OK
+   Testing discrete entries...OK (5357)
+   Testing full bucket mapred...OK (10871)
 Running "Erlang map"
-   Testing full bucket mapred...OK
-   Testing discrete entries...OK
+   Testing discrete entries...Got 2526, Expecting: 2526...OK (688)
+   Testing full bucket mapred...Got 5000, Expecting: 5000...OK (1641)
 Running "JS map"
-   Testing full bucket mapred...OK
-   Testing discrete entries...OK
+   Testing discrete entries...Got 2479, Expecting: 2479...OK (4231)
+   Testing full bucket mapred...Got 5000, Expecting: 5000...OK (12300)

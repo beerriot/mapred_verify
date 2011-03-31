@@ -122,7 +122,7 @@ verify_filter_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
 
 verify_bucket_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
     Start = erlang:now(),
-    {ok, Result} = Client:mapred_bucket(Bucket, JobDesc, 120000),
+    {ok, Result} = Client:mapred_bucket(Bucket, JobDesc, 600000),
     End = erlang:now(),
     {mapred_verifiers:Verifier(bucket, Result, KeyCount),
      erlang:round(timer:now_diff(End, Start) / 1000)}.
@@ -130,7 +130,7 @@ verify_bucket_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
 verify_entries_job(Client, Bucket, KeyCount, JobDesc, Verifier) ->
     Inputs = select_inputs(Bucket, KeyCount),
     Start = erlang:now(),
-    {ok, Result} = Client:mapred(Inputs, JobDesc, 120000),
+    {ok, Result} = Client:mapred(Inputs, JobDesc, 600000),
     End = erlang:now(),
     {mapred_verifiers:Verifier(entries, Result, length(Inputs)),
      erlang:round(timer:now_diff(End, Start) / 1000)}.
