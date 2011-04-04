@@ -1,0 +1,203 @@
+* mapred_verify
+** Overview
+   =mapred_verify= is a collection of unit tests for Riak's MapReduce
+   system
+
+** Quick Start
+
+*** Prerequisites
+
+    The mapred_verify tests use Riak's native Erlang interface, and
+    the paths to the beams implementing that interface are described
+    in terms of the Riak source tree.  So, you will need a copy of
+    Riak checked out and built locally in order to use mapred_verify.
+
+    You will also need Erlang OTP R13B04 or later installed.
+
+*** Building
+
+    Before using mapred_verify, you'll need to compile it.  Simple
+    type =make= at the commandline.  The compilation should produce an
+    executable script named =mapred_verify=.
+
+*** Usage
+
+    To use mapred_verify, run the script with two command line
+    parameters: =-s= specifying the Erlang node name of the Riak node
+    to connect to, and =-c= specifying the base directory of your Riak
+    source tree:
+
+#+BEGIN_SRC shell
+$ RIAK_NODE=riak@127.0.0.1
+$ RIAK_SRC=/Users/foobar/riak
+$ ./mapred_verify -s $RIAK_NODE -c $RIAK_SRC
+#+END_SRC
+
+    If running =mapred_verify= as above, with no other commandline
+    arguments, runs without error, then you have built everything and
+    specified arguments correctly.  If you see errors printed, please
+    consult the [[Troubleshooting]] section.
+
+    The mapred_verify script has two phases: populate (=-p=) and run
+    (=-j=).  The first time you run mapred_verify, you must populate
+    the dataset on which the tests will run by specifying =-p true= on
+    the command line:
+
+#+BEGIN_SRC shell
+$ ./mapred_verify -s $RIAK_NODE -c $RIAK_SRC -p true
+Clearing old data from <<"mr_validate">>
+Populating new data to <<"mr_validate">>
+#+END_SRC
+
+    A successful population run should produce output similar to that
+    given above: two messages about clearing and populating data,
+    including the bucket name being used.
+
+    Once the sample dataset has been loaded, you may run the tests by
+    specifying =-j true=:
+
+#+BEGIN_SRC shell
+$ ./mapred_verify -s $RIAK_NODE -c $RIAK_SRC -j true
+Verifying map/reduce jobs
+Running "Erlang/Erlang"
+   Testing discrete entries...OK (102)
+   Testing full bucket mapred...OK (234)
+   Testing filtered bucket mapred...OK (218)
+   Testing missing object...OK (1)
+Running "JS/JS"
+   Testing discrete entries...OK (2293)
+   Testing full bucket mapred...OK (1040)
+   Testing filtered bucket mapred...OK (826)
+   Testing missing object...OK (3)
+Running "JS/Erlang"
+   Testing discrete entries...OK (2190)
+   Testing full bucket mapred...OK (981)
+   Testing filtered bucket mapred...OK (654)
+   Testing missing object...OK (1)
+Running "Erlang/JS"
+   Testing discrete entries...OK (93)
+   Testing full bucket mapred...OK (230)
+   Testing filtered bucket mapred...OK (214)
+   Testing missing object...OK (2)
+Running "JS/Erlang/JS"
+   Testing discrete entries...OK (1579)
+   Testing full bucket mapred...OK (918)
+   Testing filtered bucket mapred...OK (598)
+   Testing missing object...OK (2)
+Running "Erlang/JS/Erlang"
+   Testing discrete entries...OK (96)
+   Testing full bucket mapred...OK (230)
+   Testing filtered bucket mapred...OK (208)
+   Testing missing object...OK (2)
+Running "Erlang/JS/JS"
+   Testing discrete entries...OK (102)
+   Testing full bucket mapred...OK (241)
+   Testing filtered bucket mapred...OK (190)
+   Testing missing object...OK (2)
+Running "Erlang map"
+   Testing discrete entries...Got 490, Expecting: 490...OK (83)
+   Testing full bucket mapred...Got 1000, Expecting: 1000...OK (215)
+   Testing filtered bucket mapred...Got 200, Expecting: 200...OK (195)
+   Testing missing object...Warning: 1 Map Result?OK (1)
+Running "JS map"
+   Testing discrete entries...Got 479, Expecting: 479...OK (1342)
+   Testing full bucket mapred...Got 1000, Expecting: 1000...OK (1042)
+   Testing filtered bucket mapred...Got 200, Expecting: 200...OK (562)
+   Testing missing object...Warning: 1 Map Result?OK (1)
+Running "Link prev"
+   Testing discrete entries...Got 477, Expecting: 477...OK (3528)
+   Testing full bucket mapred...Got 1000, Expecting: 1000...OK (7406)
+   Testing filtered bucket mapred...Got 200, Expecting: 200...OK (1540)
+   Testing missing object...Got 0, Expecting: 0...OK (1)
+#+END_SRC
+
+    You do not need to repopulate the dataset between tests, unless
+    you delete your Riak data.
+
+    When all tests pass, output should look similar to the capture
+    above.  Each test case is run in four different ways:
+
+    * specifying a specific list of bucket/key pairs ("discrete entries")
+    * processing an entire bucket ("full bucket")
+    * using keyfilters ("filtered bucket")
+    * specifying a non-existent bucket/key pair ("missing object")
+
+    Passing tests should print "OK" and an execution time (in
+    milliseconds), while failing tests will print "FAIL".
+
+** Options
+
+   The mapred_verify script accepts three options, in addition to
+   those described in the [[Quick Start]].
+
+   The first option is =-k=, the "key count".  In the populate phase,
+   this option specifies the number of objects to create.  In the
+   test-running phase, this option specifies the size of the available
+   input set.  It is generally a good idea to specify the same =-k=
+   for your populate and test-run phases -- the full-bucket and
+   filtered-bucket tests will fail validation if you do otherwise.
+   This option should be specified as an integer, and it defaults to
+   1000.
+
+   The next option is =-b=, the "object size".  This option is only
+   used in the populate phase.  It specifies how large the value of
+   each object should be.  It is specified as an integer number of
+   bytes or kilobytes, with the suffix, either =b= or =k=, determining
+   which unit to use (e.g. "100b" means 100 bytes, with "48k" means 48
+   kilobytes).
+
+   The final option is =-f=, the "test filename".  This option allows
+   you to specify which file defines the tests to run.  The test
+   definition file is an Erlang-format file, ready for use with
+   =file:consult/1=.  Each entry should be of the form
+   ={Name::string(), {MapReduceQuery::list(), VerificationFunction::atom()}}.=.
+   This option is specified as a path, and defaults to "priv/tests.def".
+
+** Troubleshooting
+
+*** ERROR: Path for ... not found or doesn't point to a directory
+
+    mapred_verify was unable to find the compiled Erlang files that
+    implement Riak's native interface.  Check the path you provided in
+    the =-c= command line parameter.  The directory you provided
+    should include =deps/riak_core/ebin=, =deps/riak_kv/ebin=, and
+    =deps/luke/ebin=, each containing many =*.beam= files.
+
+*** escript: exception error: ... {could_not_reach_node,'...'}
+
+    mapred_verify was unable to connect to your Riak node.  Check the
+    node name you provided in the =-s= command line parameter.  Your
+    Riak node should be running, and using that name.
+
+    mapred_verify also assumes that your node is using the cookie
+    '=riak='.  If that is incorrect, please edit
+    =src/mapred_verify.erl= (search for the line with
+    =erlang:set_cookie=) and recompile, or change the cookie for your
+    Riak node.
+
+** Contributing
+   We encourage contributions to =mapred_verify= from the community.
+
+   1) Fork the =mapred_verify= repository on
+      [[https://github.com/basho/mapred_verify][Github]].
+   2) Clone your fork or add the remote if you already have a clone of
+      the repository.
+#+BEGIN_SRC shell
+git clone git@github.com:yourusername/mapred_verify.git
+# or
+git remote add mine git@github.com:yourusername/mapred_verify.git
+#+END_SRC
+   3) Create a topic branch for your change.
+#+BEGIN_SRC shell
+git checkout -b some-topic-branch
+#+END_SRC
+   4) Make your change and commit. Use a clear and descriptive commit
+      message, spanning multiple lines if detailed explanation is
+      needed.
+   5) Push to your fork of the repository and then send a pull-request
+      through Github.
+#+BEGIN_SRC shell
+git push mine some-topic-branch
+#+END_SRC
+   6) A Basho engineer or community maintainer will review your patch
+      and merge it into the main repository or send you feedback.
